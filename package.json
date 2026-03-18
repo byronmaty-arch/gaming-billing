@@ -1,0 +1,12 @@
+{
+  "name": "gaming-billing",
+  "version": "1.0.0",
+  "description": "PlayStation Gaming Station Billing System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
