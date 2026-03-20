@@ -12,15 +12,19 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '714460753';
 const RATES = { PS3: 2000, PS4: 3000, PS5: 5000 };
 
 const BRANCHES = [
-  { id: 1, name: 'Gamers Galaxy Kajjansi', stations: 6 },
-  { id: 2, name: 'Gamers Galaxy Kitende',  stations: 5 },
-  { id: 3, name: 'Gamers Galaxy Ndejje',   stations: 4 }
+  { id: 1, name: 'Gamers Galaxy Kajjansi', stations: 6, isTest: false },
+  { id: 2, name: 'Gamers Galaxy Kitende',  stations: 5, isTest: false },
+  { id: 3, name: 'Gamers Galaxy Ndejje',   stations: 4, isTest: false },
+  { id: 4, name: 'Testing Site',           stations: 3, isTest: true  }
 ];
+
+const REAL_BRANCHES = BRANCHES.filter(b => !b.isTest);
 
 const PASSCODES = {
   1:     process.env.PASSCODE_B1    || 'kajjansi1',
   2:     process.env.PASSCODE_B2    || 'kitende2',
   3:     process.env.PASSCODE_B3    || 'ndejje3',
+  4:     process.env.PASSCODE_TEST  || 'testing123',
   admin: process.env.PASSCODE_ADMIN || 'admin0'
 };
 
@@ -135,7 +139,7 @@ async function buildWeeklyStats(branchId, startDate, endDate) {
 // Daily — 11:59 PM EAT every day
 cron.schedule('59 23 * * *', async () => {
   const today = kampalaDateStr();
-  for (const branch of BRANCHES) {
+  for (const branch of REAL_BRANCHES) {
     const { total, byConsole } = await buildDailyStats(branch.id, today);
     let msg = `📊 <b>Daily Report</b>\n📍 ${branch.name}\n📅 ${formatDateDisplay(today)}\n\n`;
     if (total.sessions === 0) {
@@ -158,7 +162,7 @@ cron.schedule('59 23 * * 0', async () => {
   const endDate   = kampalaDateStr();
   const startDate = kampalaDateStr(new Date(Date.now() - 6 * 864e5));
   let allSessions = 0, allRevenue = 0, lines = '';
-  for (const branch of BRANCHES) {
+  for (const branch of REAL_BRANCHES) {
     const s = await buildWeeklyStats(branch.id, startDate, endDate);
     allSessions += s.sessions;
     allRevenue  += s.revenue;
@@ -197,12 +201,13 @@ app.get('/api/admin/summary', requireAdmin, async (req, res) => {
       ]);
       return { ...branch, active_sessions: parseInt(ar[0].count), today_sessions: total.sessions, today_revenue: total.revenue };
     }));
+    const realOnly = summary.filter(b => !b.isTest);
     res.json({
       branches: summary,
       total: {
-        active:   summary.reduce((s, b) => s + b.active_sessions,  0),
-        sessions: summary.reduce((s, b) => s + b.today_sessions,   0),
-        revenue:  summary.reduce((s, b) => s + b.today_revenue,    0)
+        active:   realOnly.reduce((s, b) => s + b.active_sessions,  0),
+        sessions: realOnly.reduce((s, b) => s + b.today_sessions,   0),
+        revenue:  realOnly.reduce((s, b) => s + b.today_revenue,    0)
       }
     });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }

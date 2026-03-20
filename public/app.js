@@ -170,7 +170,12 @@ document.getElementById('passcode-input').addEventListener('keydown', (e) => {
 
 // --- Branch Dashboard ---
 function enterBranchDashboard() {
-  document.getElementById('branch-title').textContent = `${currentBranch.name}`;
+  document.getElementById('branch-title').textContent = currentBranch.name;
+  if (currentBranch.isTest) {
+    document.getElementById('training-banner').classList.remove('hidden');
+  } else {
+    document.getElementById('training-banner').classList.add('hidden');
+  }
   showScreen('dashboard');
   loadAll();
 }
@@ -337,8 +342,8 @@ async function loadAdminSummary() {
     document.getElementById('admin-total-revenue').textContent = `UGX ${total.revenue.toLocaleString()} today`;
 
     document.getElementById('admin-branch-cards').innerHTML = branches.map(b => `
-      <div class="admin-branch-card" onclick="adminEnterBranch(${b.id}, '${b.name}', ${b.stations})">
-        <h3>${b.name}</h3>
+      <div class="admin-branch-card ${b.isTest ? 'test-branch' : ''}" onclick="adminEnterBranch(${b.id}, '${b.name}', ${b.stations}, ${b.isTest})">
+        <h3>${b.name} ${b.isTest ? '<span class="test-badge">TRAINING</span>' : ''}</h3>
         <div class="admin-stat-row">
           <span class="label">Active now</span>
           <span class="value yellow">${b.active_sessions} session${b.active_sessions !== 1 ? 's' : ''}</span>
@@ -348,16 +353,16 @@ async function loadAdminSummary() {
           <span class="value">${b.today_sessions}</span>
         </div>
         <div class="admin-stat-row">
-          <span class="label">Today's revenue</span>
-          <span class="value green">UGX ${b.today_revenue.toLocaleString()}</span>
+          <span class="label">${b.isTest ? 'Not counted in revenue' : "Today's revenue"}</span>
+          <span class="value ${b.isTest ? '' : 'green'}">${b.isTest ? '—' : 'UGX ' + b.today_revenue.toLocaleString()}</span>
         </div>
       </div>
     `).join('');
   } catch (e) { console.error('Admin load error:', e); }
 }
 
-function adminEnterBranch(id, name, stationCount) {
-  currentBranch = { id, name, stations: stationCount };
+function adminEnterBranch(id, name, stationCount, isTest = false) {
+  currentBranch = { id, name, stations: stationCount, isTest };
   document.getElementById('branch-title').textContent = `🎮 ${name}`;
   // Replace logout with back-to-admin
   document.getElementById('logout-btn').textContent = '← All Branches';

@@ -190,6 +190,26 @@ body {
   transform: translateY(-1px);
 }
 
+.admin-branch-card.test-branch {
+  border-color: #92400e;
+  background: #1a1200;
+}
+
+.admin-branch-card.test-branch:hover {
+  border-color: #d97706;
+}
+
+.test-badge {
+  font-size: 0.65rem;
+  background: #78350f;
+  color: #fde68a;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  vertical-align: middle;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
 .admin-branch-card h3 {
   font-size: 0.95rem;
   font-weight: 700;
@@ -286,6 +306,17 @@ header h1 {
 #switch-branch-btn:hover {
   border-color: var(--accent-light);
   color: var(--accent-light);
+}
+
+#training-banner {
+  background: #78350f;
+  color: #fde68a;
+  text-align: center;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid #92400e;
 }
 
 #today-summary {
