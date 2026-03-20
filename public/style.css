@@ -27,6 +27,74 @@ body {
   min-height: 100vh;
 }
 
+/* Branch Selector Screen */
+#branch-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+#branch-selector {
+  text-align: center;
+  width: 100%;
+  max-width: 400px;
+}
+
+.brand-logo {
+  font-size: 3.5rem;
+  margin-bottom: 0.5rem;
+}
+
+#branch-selector h1 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--accent-light);
+  margin-bottom: 0.4rem;
+}
+
+#branch-selector p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+#branch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.branch-btn {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.branch-btn:hover {
+  border-color: var(--accent);
+  background: #1e1040;
+}
+
+.branch-btn .branch-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Header */
 header {
   background: var(--card-bg);
   border-bottom: 1px solid var(--card-border);
@@ -41,9 +109,31 @@ header {
   z-index: 10;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 header h1 {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
+  color: var(--accent-light);
+}
+
+#switch-branch-btn {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+#switch-branch-btn:hover {
+  border-color: var(--accent-light);
   color: var(--accent-light);
 }
 

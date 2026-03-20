@@ -1,6 +1,6 @@
 const RATES = { PS3: 2000, PS4: 3000, PS5: 5000 };
-const STATION_COUNT = 6;
 
+let currentBranch = null;   // { id, name, stations }
 let stations = [];
 let selectedConsole = null;
 let pendingStationId = null;
@@ -30,6 +30,52 @@ function formatTime(isoString) {
   return new Date(isoString).toLocaleTimeString('en-UG', {
     hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Kampala'
   });
+}
+
+// --- Branch Selection ---
+
+async function initBranchScreen() {
+  const res = await fetch('/api/branches');
+  const branches = await res.json();
+
+  const list = document.getElementById('branch-list');
+  list.innerHTML = branches.map(b => `
+    <button class="branch-btn" onclick="selectBranch(${b.id}, '${b.name}', ${b.stations})">
+      <span>${b.name}</span>
+      <span class="branch-meta">${b.stations} stations</span>
+    </button>
+  `).join('');
+
+  // Auto-restore last branch from localStorage
+  const savedId = localStorage.getItem('branch_id');
+  if (savedId) {
+    const saved = branches.find(b => b.id === Number(savedId));
+    if (saved) {
+      selectBranch(saved.id, saved.name, saved.stations);
+      return;
+    }
+  }
+
+  document.getElementById('branch-screen').classList.remove('hidden');
+}
+
+function selectBranch(id, name, stationCount) {
+  currentBranch = { id, name, stations: stationCount };
+  localStorage.setItem('branch_id', id);
+
+  document.getElementById('branch-screen').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  document.getElementById('branch-title').textContent = `🎮 ${name}`;
+
+  loadAll();
+}
+
+function switchBranch() {
+  localStorage.removeItem('branch_id');
+  currentBranch = null;
+  stations = [];
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('branch-screen').classList.remove('hidden');
 }
 
 // --- Render Stations ---
@@ -82,60 +128,53 @@ function updateTimers() {
     const timerEl = document.getElementById(`timer-${station_id}`);
     const billEl = document.getElementById(`bill-${station_id}`);
     if (timerEl) timerEl.textContent = formatTimer(session.start_time);
-    if (billEl) {
-      const bill = calcRunningBill(session.console_type, session.start_time);
-      billEl.textContent = `UGX ${bill.toLocaleString()}`;
-    }
+    if (billEl) billEl.textContent = `UGX ${calcRunningBill(session.console_type, session.start_time).toLocaleString()}`;
   });
 }
 
 // --- API Calls ---
 
 async function loadStations() {
-  try {
-    const res = await fetch('/api/stations');
-    const data = await res.json();
-    renderStations(data);
-  } catch (e) {
-    console.error('Failed to load stations:', e);
-  }
+  const res = await fetch(`/api/stations?branch=${currentBranch.id}`);
+  const data = await res.json();
+  renderStations(data);
 }
 
 async function loadStats() {
-  try {
-    const res = await fetch('/api/stats/today');
-    const { total } = await res.json();
-    document.getElementById('total-sessions').textContent =
-      `${total.sessions} session${total.sessions !== 1 ? 's' : ''} today`;
-    document.getElementById('total-revenue').textContent =
-      `UGX ${Number(total.revenue).toLocaleString()} today`;
-  } catch (e) {
-    console.error('Failed to load stats:', e);
-  }
+  const res = await fetch(`/api/stats/today?branch=${currentBranch.id}`);
+  const { total } = await res.json();
+  document.getElementById('total-sessions').textContent =
+    `${total.sessions} session${total.sessions !== 1 ? 's' : ''} today`;
+  document.getElementById('total-revenue').textContent =
+    `UGX ${Number(total.revenue).toLocaleString()} today`;
 }
 
 async function loadHistory() {
+  const res = await fetch(`/api/sessions/history?branch=${currentBranch.id}`);
+  const sessions = await res.json();
+  const tbody = document.getElementById('history-body');
+
+  if (sessions.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No completed sessions yet</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = sessions.map(s => `
+    <tr>
+      <td>Station ${s.station_id}</td>
+      <td><span class="console-tag ${s.console_type}">${s.console_type}</span></td>
+      <td>${formatDuration(s.duration_minutes)}</td>
+      <td class="amount-cell">UGX ${s.amount_ugx.toLocaleString()}</td>
+      <td>${formatTime(s.end_time)}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadAll() {
   try {
-    const res = await fetch('/api/sessions/history');
-    const sessions = await res.json();
-    const tbody = document.getElementById('history-body');
-
-    if (sessions.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No completed sessions yet</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = sessions.map(s => `
-      <tr>
-        <td>Station ${s.station_id}</td>
-        <td><span class="console-tag ${s.console_type}">${s.console_type}</span></td>
-        <td>${formatDuration(s.duration_minutes)}</td>
-        <td class="amount-cell">UGX ${s.amount_ugx.toLocaleString()}</td>
-        <td>${formatTime(s.end_time)}</td>
-      </tr>
-    `).join('');
+    await Promise.all([loadStations(), loadStats(), loadHistory()]);
   } catch (e) {
-    console.error('Failed to load history:', e);
+    console.error('Load error:', e);
   }
 }
 
@@ -146,7 +185,11 @@ async function startSession() {
     const res = await fetch('/api/sessions/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ station_id: pendingStationId, console_type: selectedConsole })
+      body: JSON.stringify({
+        branch_id: currentBranch.id,
+        station_id: pendingStationId,
+        console_type: selectedConsole
+      })
     });
 
     if (!res.ok) {
@@ -156,8 +199,7 @@ async function startSession() {
     }
 
     closeModal();
-    await loadStations();
-    await loadStats();
+    await loadAll();
   } catch (e) {
     alert('Network error. Please try again.');
   }
@@ -173,10 +215,7 @@ async function endSession(sessionId, stationId) {
       alert(err.error || 'Failed to end session');
       return;
     }
-
-    await loadStations();
-    await loadStats();
-    await loadHistory();
+    await loadAll();
   } catch (e) {
     alert('Network error. Please try again.');
   }
@@ -187,7 +226,8 @@ async function endSession(sessionId, stationId) {
 function openModal(stationId) {
   pendingStationId = stationId;
   selectedConsole = null;
-  document.getElementById('modal-station-label').textContent = `Station ${stationId}`;
+  document.getElementById('modal-station-label').textContent =
+    `${currentBranch.name} — Station ${stationId}`;
   document.querySelectorAll('.console-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('modal-confirm').disabled = true;
   document.getElementById('modal-overlay').classList.remove('hidden');
@@ -199,7 +239,6 @@ function closeModal() {
   selectedConsole = null;
 }
 
-// Console selection buttons
 document.querySelectorAll('.console-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.console-btn').forEach(b => b.classList.remove('selected'));
@@ -217,20 +256,7 @@ document.getElementById('modal-overlay').addEventListener('click', (e) => {
 
 // --- Init ---
 
-async function init() {
-  await loadStations();
-  await loadStats();
-  await loadHistory();
+setInterval(updateTimers, 1000);
+setInterval(() => { if (currentBranch) loadAll(); }, 15000);
 
-  // Update timers every second
-  setInterval(updateTimers, 1000);
-
-  // Refresh station data every 15 seconds
-  setInterval(async () => {
-    await loadStations();
-    await loadStats();
-    await loadHistory();
-  }, 15000);
-}
-
-init();
+initBranchScreen();

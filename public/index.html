@@ -3,43 +3,61 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gaming Station Billing</title>
+  <title>Gamers Galaxy Billing</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <header>
-    <h1>🎮 Gaming Station</h1>
-    <div id="today-summary">
-      <span id="total-sessions">0 sessions</span>
-      <span class="divider">|</span>
-      <span id="total-revenue">UGX 0 today</span>
+  <!-- Branch Selector Screen -->
+  <div id="branch-screen">
+    <div id="branch-selector">
+      <div class="brand-logo">🎮</div>
+      <h1>Gamers Galaxy</h1>
+      <p>Select your branch to continue</p>
+      <div id="branch-list"></div>
     </div>
-  </header>
+  </div>
 
-  <main>
-    <div id="stations-grid"></div>
+  <!-- Main Dashboard (hidden until branch selected) -->
+  <div id="dashboard" class="hidden">
 
-    <section class="history-section">
-      <h2>Recent Sessions</h2>
-      <div id="history-table-wrapper">
-        <table id="history-table">
-          <thead>
-            <tr>
-              <th>Station</th>
-              <th>Console</th>
-              <th>Duration</th>
-              <th>Amount</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody id="history-body">
-            <tr><td colspan="5" class="empty-row">No sessions yet today</td></tr>
-          </tbody>
-        </table>
+    <header>
+      <div class="header-left">
+        <h1 id="branch-title">🎮 Gamers Galaxy</h1>
+        <button id="switch-branch-btn" onclick="switchBranch()">Switch Branch</button>
       </div>
-    </section>
-  </main>
+      <div id="today-summary">
+        <span id="total-sessions">0 sessions</span>
+        <span class="divider">|</span>
+        <span id="total-revenue">UGX 0 today</span>
+      </div>
+    </header>
+
+    <main>
+      <div id="stations-grid"></div>
+
+      <section class="history-section">
+        <h2>Recent Sessions</h2>
+        <div id="history-table-wrapper">
+          <table id="history-table">
+            <thead>
+              <tr>
+                <th>Station</th>
+                <th>Console</th>
+                <th>Duration</th>
+                <th>Amount</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="history-body">
+              <tr><td colspan="5" class="empty-row">No sessions yet today</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+  </div>
 
   <!-- Start Session Modal -->
   <div id="modal-overlay" class="hidden">
