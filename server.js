@@ -340,6 +340,14 @@ app.get('/api/stats/today', requireBranchAccess, (req, res) => {
   res.json({ by_console: byConsole, total });
 });
 
+// TEMPORARY EXPORT — download full billing.json (admin only)
+app.get('/api/export', requireAdmin, (req, res) => {
+  const data = load();
+  res.setHeader('Content-Disposition', 'attachment; filename="billing-export.json"');
+  res.setHeader('Content-Type', 'application/json');
+  res.json(data);
+});
+
 app.listen(PORT, () => {
   console.log(`\n🎮 Gamers Galaxy Billing running at http://localhost:${PORT}\n`);
 });
