@@ -283,7 +283,7 @@ async function startSession() {
 async function endSession(sessionId, stationId) {
   if (!confirm(`End session for Station ${stationId}?`)) return;
   try {
-    const res = await fetch(`/api/sessions/end/${sessionId}`, { method: 'POST', headers: apiHeaders() });
+    const res = await fetch(`/api/sessions/end/${sessionId}`, { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ branch_id: currentBranch.id }) });
     if (res.status === 401) { logout(); return; }
     if (!res.ok) { alert((await res.json()).error || 'Failed to end session'); return; }
     await loadAll();
