@@ -170,7 +170,7 @@ document.getElementById('passcode-input').addEventListener('keydown', (e) => {
 
 // --- Branch Dashboard ---
 function enterBranchDashboard() {
-  document.getElementById('branch-title').textContent = `🎮 ${currentBranch.name}`;
+  document.getElementById('branch-title').textContent = `${currentBranch.name}`;
   showScreen('dashboard');
   loadAll();
 }

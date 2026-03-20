@@ -42,8 +42,10 @@ body {
   max-width: 400px;
 }
 
-.brand-logo {
-  font-size: 3.5rem;
+.brand-logo-img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
   margin-bottom: 0.5rem;
 }
 
@@ -255,6 +257,13 @@ header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.header-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 header h1 {
