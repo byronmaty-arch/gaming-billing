@@ -1,17 +1,29 @@
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 
-const DB_FILE = path.join(__dirname, 'billing.json');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
 
-function load() {
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({ sessions: [], nextId: 1 }, null, 2));
-  }
-  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+async function init() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id          SERIAL PRIMARY KEY,
+      branch_id   INTEGER   NOT NULL,
+      station_id  INTEGER   NOT NULL,
+      console_type TEXT     NOT NULL CHECK(console_type IN ('PS3','PS4','PS5')),
+      start_time  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      end_time    TIMESTAMPTZ,
+      duration_minutes REAL,
+      amount_ugx  INTEGER,
+      status      TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed'))
+    )
+  `);
+  console.log('✅ Database ready');
 }
 
-function save(data) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+async function query(text, params) {
+  return pool.query(text, params);
 }
 
-module.exports = { load, save };
+module.exports = { init, query };
