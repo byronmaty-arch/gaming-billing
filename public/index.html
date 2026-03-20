@@ -15,16 +15,53 @@
       <h1>Gamers Galaxy</h1>
       <p>Select your branch to continue</p>
       <div id="branch-list"></div>
+      <button class="admin-link" onclick="showAdminPasscode()">Admin Access</button>
     </div>
   </div>
 
-  <!-- Main Dashboard (hidden until branch selected) -->
-  <div id="dashboard" class="hidden">
+  <!-- Passcode Screen -->
+  <div id="passcode-screen" class="hidden">
+    <div id="passcode-box">
+      <div class="brand-logo">🔒</div>
+      <h3 id="passcode-title">Enter Passcode</h3>
+      <p id="passcode-subtitle"></p>
+      <input
+        type="password"
+        id="passcode-input"
+        inputmode="numeric"
+        placeholder="Enter passcode"
+        autocomplete="off"
+      />
+      <div id="passcode-error" class="hidden">Incorrect passcode. Please try again.</div>
+      <button class="btn-primary" onclick="submitPasscode()">Enter</button>
+      <button class="btn-secondary" onclick="backToBranches()">Back</button>
+    </div>
+  </div>
 
+  <!-- Admin Dashboard -->
+  <div id="admin-screen" class="hidden">
+    <header>
+      <div class="header-left">
+        <h1>🎮 Gamers Galaxy — Admin</h1>
+      </div>
+      <div id="admin-summary-bar">
+        <span id="admin-total-active"></span>
+        <span class="divider">|</span>
+        <span id="admin-total-revenue"></span>
+        <button id="admin-logout-btn" onclick="logout()">Logout</button>
+      </div>
+    </header>
+    <main>
+      <div id="admin-branch-cards"></div>
+    </main>
+  </div>
+
+  <!-- Main Branch Dashboard -->
+  <div id="dashboard" class="hidden">
     <header>
       <div class="header-left">
         <h1 id="branch-title">🎮 Gamers Galaxy</h1>
-        <button id="switch-branch-btn" onclick="switchBranch()">Switch Branch</button>
+        <button id="logout-btn" onclick="logout()">Logout</button>
       </div>
       <div id="today-summary">
         <span id="total-sessions">0 sessions</span>
@@ -32,10 +69,8 @@
         <span id="total-revenue">UGX 0 today</span>
       </div>
     </header>
-
     <main>
       <div id="stations-grid"></div>
-
       <section class="history-section">
         <h2>Recent Sessions</h2>
         <div id="history-table-wrapper">
@@ -56,7 +91,6 @@
         </div>
       </section>
     </main>
-
   </div>
 
   <!-- Start Session Modal -->

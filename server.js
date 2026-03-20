@@ -17,8 +17,41 @@ const BRANCHES = [
   { id: 3, name: 'Gamers Galaxy Ndejje',  stations: 4 }
 ];
 
+// Passcodes — set these as environment variables on Railway
+const PASSCODES = {
+  1:     process.env.PASSCODE_B1    || 'kajjansi1',
+  2:     process.env.PASSCODE_B2    || 'kitende2',
+  3:     process.env.PASSCODE_B3    || 'ndejje3',
+  admin: process.env.PASSCODE_ADMIN || 'admin0'
+};
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// --- Auth helpers ---
+
+function isAdminPasscode(p) { return p === PASSCODES.admin; }
+function branchForPasscode(p) {
+  for (const b of BRANCHES) {
+    if (p === PASSCODES[b.id]) return b.id;
+  }
+  return null;
+}
+
+function requireBranchAccess(req, res, next) {
+  const passcode = req.headers['x-passcode'];
+  if (!passcode) return res.status(401).json({ error: 'Passcode required' });
+  if (isAdminPasscode(passcode)) return next();
+  const branchId = Number(req.query.branch || req.body?.branch_id);
+  if (branchId && passcode === PASSCODES[branchId]) return next();
+  return res.status(401).json({ error: 'Incorrect passcode' });
+}
+
+function requireAdmin(req, res, next) {
+  const passcode = req.headers['x-passcode'];
+  if (passcode && isAdminPasscode(passcode)) return next();
+  return res.status(401).json({ error: 'Admin access required' });
+}
 
 // --- Telegram ---
 async function sendTelegram(message) {
@@ -48,7 +81,7 @@ function formatTime(isoString) {
 }
 
 function kampalaDateStr(date = new Date()) {
-  return date.toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' }); // YYYY-MM-DD
+  return date.toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
 }
 
 function formatDateDisplay(dateStr) {
@@ -74,18 +107,15 @@ function buildDailyStats(branchId, dateStr) {
     (s.branch_id === branchId || (!s.branch_id && branchId === 1)) &&
     sessionDateKampala(s) === dateStr
   );
-
   const total = {
     sessions: filtered.length,
     revenue: filtered.reduce((sum, s) => sum + (s.amount_ugx || 0), 0)
   };
-
   const byConsole = ['PS3', 'PS4', 'PS5'].map(type => ({
     console_type: type,
     sessions: filtered.filter(s => s.console_type === type).length,
     revenue: filtered.filter(s => s.console_type === type).reduce((sum, s) => sum + (s.amount_ugx || 0), 0)
   })).filter(c => c.sessions > 0);
-
   return { total, byConsole };
 }
 
@@ -97,7 +127,6 @@ function buildWeeklyStats(branchId, dates) {
     (s.branch_id === branchId || (!s.branch_id && branchId === 1)) &&
     dates.includes(sessionDateKampala(s))
   );
-
   return {
     sessions: filtered.length,
     revenue: filtered.reduce((sum, s) => sum + (s.amount_ugx || 0), 0)
@@ -105,80 +134,104 @@ function buildWeeklyStats(branchId, dates) {
 }
 
 // --- Scheduled Reports ---
-
-// Daily report at 11:59 PM EAT, one message per branch
 cron.schedule('59 23 * * *', async () => {
   const today = kampalaDateStr();
   const dateDisplay = formatDateDisplay(today);
-
   for (const branch of BRANCHES) {
     const { total, byConsole } = buildDailyStats(branch.id, today);
-
-    let msg = `📊 <b>Daily Report</b>\n`;
-    msg += `📍 ${branch.name}\n`;
-    msg += `📅 ${dateDisplay}\n\n`;
-
+    let msg = `📊 <b>Daily Report</b>\n📍 ${branch.name}\n📅 ${dateDisplay}\n\n`;
     if (total.sessions === 0) {
       msg += `No sessions recorded today.`;
     } else {
-      msg += `🕹 Sessions: <b>${total.sessions}</b>\n`;
-      msg += `💰 Revenue: <b>UGX ${total.revenue.toLocaleString()}</b>\n`;
-
+      msg += `🕹 Sessions: <b>${total.sessions}</b>\n💰 Revenue: <b>UGX ${total.revenue.toLocaleString()}</b>`;
       if (byConsole.length > 0) {
-        msg += `\n<b>By Console:</b>\n`;
+        msg += `\n\n<b>By Console:</b>\n`;
         byConsole.forEach(c => {
           msg += `  ${c.console_type}: ${c.sessions} session${c.sessions !== 1 ? 's' : ''} — UGX ${c.revenue.toLocaleString()}\n`;
         });
       }
     }
-
     await sendTelegram(msg);
   }
 }, { timezone: 'Africa/Kampala' });
 
-// Weekly report every Sunday at 11:59 PM EAT
 cron.schedule('59 23 * * 0', async () => {
-  // Last 7 days including today
   const dates = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     dates.push(kampalaDateStr(d));
   }
-
   const startDisplay = formatDateDisplay(dates[6]);
   const endDisplay = formatDateDisplay(dates[0]);
-
-  let allSessions = 0;
-  let allRevenue = 0;
-  let branchLines = '';
-
+  let allSessions = 0, allRevenue = 0, branchLines = '';
   for (const branch of BRANCHES) {
     const stats = buildWeeklyStats(branch.id, dates);
     allSessions += stats.sessions;
     allRevenue += stats.revenue;
     branchLines += `  📍 ${branch.name}: ${stats.sessions} sessions — UGX ${stats.revenue.toLocaleString()}\n`;
   }
-
-  let msg = `📈 <b>Weekly Report</b>\n`;
-  msg += `📅 ${startDisplay} → ${endDisplay}\n\n`;
+  let msg = `📈 <b>Weekly Report</b>\n📅 ${startDisplay} → ${endDisplay}\n\n`;
   msg += branchLines;
-  msg += `\n<b>All Branches Total:</b>\n`;
-  msg += `🕹 ${allSessions} sessions\n`;
-  msg += `💰 UGX ${allRevenue.toLocaleString()}`;
-
+  msg += `\n<b>All Branches Total:</b>\n🕹 ${allSessions} sessions\n💰 UGX ${allRevenue.toLocaleString()}`;
   await sendTelegram(msg);
 }, { timezone: 'Africa/Kampala' });
 
 // --- API Routes ---
 
-// List branches
+// Validate passcode (called by frontend on login)
+app.post('/api/auth', (req, res) => {
+  const { passcode, branch_id } = req.body;
+  if (!passcode) return res.status(400).json({ error: 'Passcode required' });
+
+  if (isAdminPasscode(passcode)) {
+    return res.json({ success: true, role: 'admin' });
+  }
+
+  const matchedBranch = branchForPasscode(passcode);
+  if (matchedBranch) {
+    // If a branch was selected, make sure the passcode matches that branch
+    if (branch_id && matchedBranch !== branch_id) {
+      return res.status(401).json({ error: 'Incorrect passcode' });
+    }
+    return res.json({ success: true, role: 'staff', branch_id: matchedBranch });
+  }
+
+  return res.status(401).json({ error: 'Incorrect passcode' });
+});
+
+// List branches (public — needed for branch selector screen)
 app.get('/api/branches', (req, res) => {
   res.json(BRANCHES);
 });
 
+// Admin summary — all branches at a glance
+app.get('/api/admin/summary', requireAdmin, (req, res) => {
+  const today = kampalaDateStr();
+  const summary = BRANCHES.map(branch => {
+    const { sessions } = load();
+    const active = sessions.filter(s =>
+      (s.branch_id === branch.id || (!s.branch_id && branch.id === 1)) &&
+      s.status === 'active'
+    ).length;
+    const { total } = buildDailyStats(branch.id, today);
+    return {
+      ...branch,
+      active_sessions: active,
+      today_sessions: total.sessions,
+      today_revenue: total.revenue
+    };
+  });
+  const grandTotal = {
+    sessions: summary.reduce((s, b) => s + b.today_sessions, 0),
+    revenue: summary.reduce((s, b) => s + b.today_revenue, 0),
+    active: summary.reduce((s, b) => s + b.active_sessions, 0)
+  };
+  res.json({ branches: summary, total: grandTotal });
+});
+
 // Get stations for a branch
-app.get('/api/stations', (req, res) => {
+app.get('/api/stations', requireBranchAccess, (req, res) => {
   const branchId = Number(req.query.branch);
   const branch = BRANCHES.find(b => b.id === branchId);
   if (!branch) return res.status(400).json({ error: 'Invalid branch' });
@@ -197,9 +250,8 @@ app.get('/api/stations', (req, res) => {
 });
 
 // Start a session
-app.post('/api/sessions/start', (req, res) => {
+app.post('/api/sessions/start', requireBranchAccess, (req, res) => {
   const { branch_id, station_id, console_type } = req.body;
-
   if (!RATES[console_type]) return res.status(400).json({ error: 'Invalid console type' });
   if (!BRANCHES.find(b => b.id === branch_id)) return res.status(400).json({ error: 'Invalid branch' });
 
@@ -222,28 +274,31 @@ app.post('/api/sessions/start', (req, res) => {
     amount_ugx: null,
     status: 'active'
   };
-
   db.sessions.push(session);
   save(db);
 
   sendTelegram(
-    `🟢 <b>Session Started</b>\n\n` +
-    `📍 ${branchName(branch_id)}\n` +
-    `📺 Station ${station_id}\n` +
-    `🕹 Console: ${console_type}\n` +
-    `⏰ Started: ${formatTime(session.start_time)}\n` +
+    `🟢 <b>Session Started</b>\n\n📍 ${branchName(branch_id)}\n📺 Station ${station_id}\n` +
+    `🕹 Console: ${console_type}\n⏰ Started: ${formatTime(session.start_time)}\n` +
     `💵 Rate: UGX ${RATES[console_type].toLocaleString()}/hr`
   );
-
   res.json(session);
 });
 
 // End a session
-app.post('/api/sessions/end/:id', (req, res) => {
+app.post('/api/sessions/end/:id', requireBranchAccess, (req, res) => {
+  const passcode = req.headers['x-passcode'];
   const db = load();
   const session = db.sessions.find(s => s.id === Number(req.params.id) && s.status === 'active');
-
   if (!session) return res.status(404).json({ error: 'Active session not found' });
+
+  // Staff can only end sessions belonging to their branch
+  if (!isAdminPasscode(passcode)) {
+    const allowedBranch = branchForPasscode(passcode);
+    if (session.branch_id !== allowedBranch) {
+      return res.status(403).json({ error: 'Not authorized for this session' });
+    }
+  }
 
   const endTime = new Date();
   const durationMinutes = (endTime - new Date(session.start_time)) / 60000;
@@ -253,24 +308,18 @@ app.post('/api/sessions/end/:id', (req, res) => {
   session.duration_minutes = durationMinutes;
   session.amount_ugx = amount;
   session.status = 'completed';
-
   save(db);
 
   sendTelegram(
-    `🔴 <b>Session Ended</b>\n\n` +
-    `📍 ${branchName(session.branch_id || 1)}\n` +
-    `📺 Station ${session.station_id}\n` +
-    `🕹 Console: ${session.console_type}\n` +
-    `⏱ Duration: ${formatDuration(durationMinutes)}\n` +
-    `💰 Amount: UGX ${amount.toLocaleString()}\n` +
-    `🕐 Ended: ${formatTime(endTime.toISOString())}`
+    `🔴 <b>Session Ended</b>\n\n📍 ${branchName(session.branch_id || 1)}\n📺 Station ${session.station_id}\n` +
+    `🕹 Console: ${session.console_type}\n⏱ Duration: ${formatDuration(durationMinutes)}\n` +
+    `💰 Amount: UGX ${amount.toLocaleString()}\n🕐 Ended: ${formatTime(endTime.toISOString())}`
   );
-
   res.json(session);
 });
 
-// Session history for a branch (last 50)
-app.get('/api/sessions/history', (req, res) => {
+// Session history for a branch
+app.get('/api/sessions/history', requireBranchAccess, (req, res) => {
   const branchId = Number(req.query.branch);
   const { sessions } = load();
   const completed = sessions
@@ -284,7 +333,7 @@ app.get('/api/sessions/history', (req, res) => {
 });
 
 // Today's stats for a branch
-app.get('/api/stats/today', (req, res) => {
+app.get('/api/stats/today', requireBranchAccess, (req, res) => {
   const branchId = Number(req.query.branch);
   const today = kampalaDateStr();
   const { total, byConsole } = buildDailyStats(branchId, today);

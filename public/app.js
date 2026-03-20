@@ -1,12 +1,14 @@
 const RATES = { PS3: 2000, PS4: 3000, PS5: 5000 };
 
 let currentBranch = null;   // { id, name, stations }
+let currentPasscode = null; // stored for API calls
+let currentRole = null;     // 'staff' | 'admin'
+let pendingBranch = null;   // branch clicked before passcode entered
 let stations = [];
 let selectedConsole = null;
 let pendingStationId = null;
 
 // --- Helpers ---
-
 function formatTimer(startIso) {
   const elapsed = Math.floor((Date.now() - new Date(startIso)) / 1000);
   const h = Math.floor(elapsed / 3600);
@@ -32,53 +34,146 @@ function formatTime(isoString) {
   });
 }
 
-// --- Branch Selection ---
+function apiHeaders() {
+  return { 'Content-Type': 'application/json', 'X-Passcode': currentPasscode };
+}
 
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+// --- Screen navigation ---
+function showScreen(screenId) {
+  ['branch-screen', 'passcode-screen', 'admin-screen', 'dashboard'].forEach(hide);
+  show(screenId);
+}
+
+// --- Session storage ---
+function saveSession() {
+  sessionStorage.setItem('gg_role', currentRole);
+  sessionStorage.setItem('gg_passcode', currentPasscode);
+  if (currentBranch) sessionStorage.setItem('gg_branch', JSON.stringify(currentBranch));
+}
+
+function loadSession() {
+  const role = sessionStorage.getItem('gg_role');
+  const passcode = sessionStorage.getItem('gg_passcode');
+  if (!role || !passcode) return false;
+  currentRole = role;
+  currentPasscode = passcode;
+  if (role === 'admin') {
+    enterAdmin();
+  } else {
+    const branch = JSON.parse(sessionStorage.getItem('gg_branch') || 'null');
+    if (branch) {
+      currentBranch = branch;
+      enterBranchDashboard();
+    }
+  }
+  return true;
+}
+
+function logout() {
+  sessionStorage.clear();
+  currentRole = null;
+  currentPasscode = null;
+  currentBranch = null;
+  stations = [];
+  showScreen('branch-screen');
+}
+
+// --- Branch selector ---
 async function initBranchScreen() {
   const res = await fetch('/api/branches');
   const branches = await res.json();
 
   const list = document.getElementById('branch-list');
   list.innerHTML = branches.map(b => `
-    <button class="branch-btn" onclick="selectBranch(${b.id}, '${b.name}', ${b.stations})">
+    <button class="branch-btn" onclick="onBranchClick(${b.id}, '${b.name}', ${b.stations})">
       <span>${b.name}</span>
       <span class="branch-meta">${b.stations} stations</span>
     </button>
   `).join('');
+}
 
-  // Auto-restore last branch from localStorage
-  const savedId = localStorage.getItem('branch_id');
-  if (savedId) {
-    const saved = branches.find(b => b.id === Number(savedId));
-    if (saved) {
-      selectBranch(saved.id, saved.name, saved.stations);
+function onBranchClick(id, name, stationCount) {
+  pendingBranch = { id, name, stations: stationCount };
+  document.getElementById('passcode-title').textContent = name;
+  document.getElementById('passcode-subtitle').textContent = 'Enter your branch passcode';
+  document.getElementById('passcode-input').value = '';
+  document.getElementById('passcode-error').classList.add('hidden');
+  showScreen('passcode-screen');
+  document.getElementById('passcode-input').focus();
+}
+
+function showAdminPasscode() {
+  pendingBranch = null;
+  document.getElementById('passcode-title').textContent = 'Admin Access';
+  document.getElementById('passcode-subtitle').textContent = 'Enter admin passcode';
+  document.getElementById('passcode-input').value = '';
+  document.getElementById('passcode-error').classList.add('hidden');
+  showScreen('passcode-screen');
+  document.getElementById('passcode-input').focus();
+}
+
+function backToBranches() {
+  pendingBranch = null;
+  showScreen('branch-screen');
+}
+
+// --- Passcode submission ---
+async function submitPasscode() {
+  const passcode = document.getElementById('passcode-input').value.trim();
+  if (!passcode) return;
+
+  const errorEl = document.getElementById('passcode-error');
+  errorEl.classList.add('hidden');
+
+  try {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passcode, branch_id: pendingBranch?.id || null })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      errorEl.textContent = data.error || 'Incorrect passcode. Please try again.';
+      errorEl.classList.remove('hidden');
+      document.getElementById('passcode-input').value = '';
+      document.getElementById('passcode-input').focus();
       return;
     }
-  }
 
-  document.getElementById('branch-screen').classList.remove('hidden');
+    currentPasscode = passcode;
+    currentRole = data.role;
+
+    if (data.role === 'admin') {
+      currentBranch = null;
+      saveSession();
+      enterAdmin();
+    } else {
+      currentBranch = pendingBranch;
+      saveSession();
+      enterBranchDashboard();
+    }
+  } catch (e) {
+    errorEl.textContent = 'Network error. Please try again.';
+    errorEl.classList.remove('hidden');
+  }
 }
 
-function selectBranch(id, name, stationCount) {
-  currentBranch = { id, name, stations: stationCount };
-  localStorage.setItem('branch_id', id);
+// Allow Enter key on passcode input
+document.getElementById('passcode-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitPasscode();
+});
 
-  document.getElementById('branch-screen').classList.add('hidden');
-  document.getElementById('dashboard').classList.remove('hidden');
-  document.getElementById('branch-title').textContent = `🎮 ${name}`;
-
+// --- Branch Dashboard ---
+function enterBranchDashboard() {
+  document.getElementById('branch-title').textContent = `🎮 ${currentBranch.name}`;
+  showScreen('dashboard');
   loadAll();
 }
-
-function switchBranch() {
-  localStorage.removeItem('branch_id');
-  currentBranch = null;
-  stations = [];
-  document.getElementById('dashboard').classList.add('hidden');
-  document.getElementById('branch-screen').classList.remove('hidden');
-}
-
-// --- Render Stations ---
 
 function renderStations(data) {
   stations = data;
@@ -115,12 +210,9 @@ function renderStations(data) {
         </button>
       `;
     }
-
     grid.appendChild(card);
   });
 }
-
-// --- Live Timers ---
 
 function updateTimers() {
   stations.forEach(({ station_id, session }) => {
@@ -132,16 +224,15 @@ function updateTimers() {
   });
 }
 
-// --- API Calls ---
-
 async function loadStations() {
-  const res = await fetch(`/api/stations?branch=${currentBranch.id}`);
-  const data = await res.json();
-  renderStations(data);
+  const res = await fetch(`/api/stations?branch=${currentBranch.id}`, { headers: apiHeaders() });
+  if (res.status === 401) { logout(); return; }
+  renderStations(await res.json());
 }
 
 async function loadStats() {
-  const res = await fetch(`/api/stats/today?branch=${currentBranch.id}`);
+  const res = await fetch(`/api/stats/today?branch=${currentBranch.id}`, { headers: apiHeaders() });
+  if (res.status === 401) { logout(); return; }
   const { total } = await res.json();
   document.getElementById('total-sessions').textContent =
     `${total.sessions} session${total.sessions !== 1 ? 's' : ''} today`;
@@ -150,15 +241,14 @@ async function loadStats() {
 }
 
 async function loadHistory() {
-  const res = await fetch(`/api/sessions/history?branch=${currentBranch.id}`);
+  const res = await fetch(`/api/sessions/history?branch=${currentBranch.id}`, { headers: apiHeaders() });
+  if (res.status === 401) { logout(); return; }
   const sessions = await res.json();
   const tbody = document.getElementById('history-body');
-
   if (sessions.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No completed sessions yet</td></tr>`;
     return;
   }
-
   tbody.innerHTML = sessions.map(s => `
     <tr>
       <td>Station ${s.station_id}</td>
@@ -171,70 +261,47 @@ async function loadHistory() {
 }
 
 async function loadAll() {
-  try {
-    await Promise.all([loadStations(), loadStats(), loadHistory()]);
-  } catch (e) {
-    console.error('Load error:', e);
-  }
+  try { await Promise.all([loadStations(), loadStats(), loadHistory()]); }
+  catch (e) { console.error('Load error:', e); }
 }
 
 async function startSession() {
   if (!pendingStationId || !selectedConsole) return;
-
   try {
     const res = await fetch('/api/sessions/start', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        branch_id: currentBranch.id,
-        station_id: pendingStationId,
-        console_type: selectedConsole
-      })
+      headers: apiHeaders(),
+      body: JSON.stringify({ branch_id: currentBranch.id, station_id: pendingStationId, console_type: selectedConsole })
     });
-
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || 'Failed to start session');
-      return;
-    }
-
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) { alert((await res.json()).error || 'Failed to start session'); return; }
     closeModal();
     await loadAll();
-  } catch (e) {
-    alert('Network error. Please try again.');
-  }
+  } catch (e) { alert('Network error. Please try again.'); }
 }
 
 async function endSession(sessionId, stationId) {
   if (!confirm(`End session for Station ${stationId}?`)) return;
-
   try {
-    const res = await fetch(`/api/sessions/end/${sessionId}`, { method: 'POST' });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || 'Failed to end session');
-      return;
-    }
+    const res = await fetch(`/api/sessions/end/${sessionId}`, { method: 'POST', headers: apiHeaders() });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) { alert((await res.json()).error || 'Failed to end session'); return; }
     await loadAll();
-  } catch (e) {
-    alert('Network error. Please try again.');
-  }
+  } catch (e) { alert('Network error. Please try again.'); }
 }
 
 // --- Modal ---
-
 function openModal(stationId) {
   pendingStationId = stationId;
   selectedConsole = null;
-  document.getElementById('modal-station-label').textContent =
-    `${currentBranch.name} — Station ${stationId}`;
+  document.getElementById('modal-station-label').textContent = `${currentBranch.name} — Station ${stationId}`;
   document.querySelectorAll('.console-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('modal-confirm').disabled = true;
-  document.getElementById('modal-overlay').classList.remove('hidden');
+  show('modal-overlay');
 }
 
 function closeModal() {
-  document.getElementById('modal-overlay').classList.add('hidden');
+  hide('modal-overlay');
   pendingStationId = null;
   selectedConsole = null;
 }
@@ -254,9 +321,69 @@ document.getElementById('modal-overlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 });
 
-// --- Init ---
+// --- Admin Dashboard ---
+function enterAdmin() {
+  showScreen('admin-screen');
+  loadAdminSummary();
+}
 
+async function loadAdminSummary() {
+  try {
+    const res = await fetch('/api/admin/summary', { headers: apiHeaders() });
+    if (res.status === 401) { logout(); return; }
+    const { branches, total } = await res.json();
+
+    document.getElementById('admin-total-active').textContent = `${total.active} active`;
+    document.getElementById('admin-total-revenue').textContent = `UGX ${total.revenue.toLocaleString()} today`;
+
+    document.getElementById('admin-branch-cards').innerHTML = branches.map(b => `
+      <div class="admin-branch-card" onclick="adminEnterBranch(${b.id}, '${b.name}', ${b.stations})">
+        <h3>${b.name}</h3>
+        <div class="admin-stat-row">
+          <span class="label">Active now</span>
+          <span class="value yellow">${b.active_sessions} session${b.active_sessions !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="label">Today's sessions</span>
+          <span class="value">${b.today_sessions}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="label">Today's revenue</span>
+          <span class="value green">UGX ${b.today_revenue.toLocaleString()}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) { console.error('Admin load error:', e); }
+}
+
+function adminEnterBranch(id, name, stationCount) {
+  currentBranch = { id, name, stations: stationCount };
+  document.getElementById('branch-title').textContent = `🎮 ${name}`;
+  // Replace logout with back-to-admin
+  document.getElementById('logout-btn').textContent = '← All Branches';
+  document.getElementById('logout-btn').onclick = () => {
+    currentBranch = null;
+    document.getElementById('logout-btn').textContent = 'Logout';
+    document.getElementById('logout-btn').onclick = logout;
+    enterAdmin();
+  };
+  showScreen('dashboard');
+  loadAll();
+}
+
+// --- Timers & polling ---
 setInterval(updateTimers, 1000);
-setInterval(() => { if (currentBranch) loadAll(); }, 15000);
+setInterval(() => {
+  if (currentRole === 'staff' && currentBranch) loadAll();
+  if (currentRole === 'admin' && !currentBranch) loadAdminSummary();
+}, 15000);
 
-initBranchScreen();
+// --- Init ---
+async function init() {
+  await initBranchScreen();
+  if (!loadSession()) {
+    showScreen('branch-screen');
+  }
+}
+
+init();

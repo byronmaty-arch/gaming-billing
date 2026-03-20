@@ -94,6 +94,148 @@ body {
   font-weight: 400;
 }
 
+.admin-link {
+  margin-top: 1.5rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-link:hover { color: var(--accent-light); }
+
+/* Passcode Screen */
+#passcode-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+#passcode-box {
+  text-align: center;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#passcode-box h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+#passcode-box p {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-top: -0.25rem;
+}
+
+#passcode-input {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1.2rem;
+  text-align: center;
+  letter-spacing: 0.3em;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#passcode-input:focus { border-color: var(--accent); }
+
+#passcode-error {
+  color: var(--red);
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  background: #2d0a0a;
+  border-radius: 8px;
+}
+
+/* Admin Dashboard */
+#admin-screen main {
+  padding: 1.25rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+#admin-branch-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-branch-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.1s;
+}
+
+.admin-branch-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.admin-branch-card h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--accent-light);
+}
+
+.admin-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--card-border);
+  font-size: 0.875rem;
+}
+
+.admin-stat-row .label { color: var(--text-muted); }
+.admin-stat-row .value { font-weight: 600; }
+.admin-stat-row .value.green { color: var(--green); }
+.admin-stat-row .value.yellow { color: var(--yellow); }
+
+#admin-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+#admin-total-revenue { color: var(--green); font-weight: 600; }
+
+#admin-logout-btn, #logout-btn {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+#admin-logout-btn:hover, #logout-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
 /* Header */
 header {
   background: var(--card-bg);
